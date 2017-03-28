@@ -1,0 +1,290 @@
+
+%% FinalProject.tex
+%% CS698 - Spring 2012
+%% Professor: Amarda Shehu
+%%
+%% Team: Brian Moriarty / Stuart Roettger
+%% May 11, 2012
+%%
+%% This is the Latex code for our final project, formatting based on the
+%% IEEE bare_adv.tex template provided by Michael Shell.
+%%
+
+\documentclass[12pt,journal,compsoc]{IEEEtran}
+% The Computer Society requires 12pt.
+
+% *** GRAPHICS RELATED PACKAGES ***
+%
+\ifCLASSINFOpdf
+   \usepackage[pdftex]{graphicx}
+  % declare the path(s) where your graphic files are
+   \graphicspath{{../pdf/}{../jpeg/}}
+  % and their extensions so you won't have to specify these with
+  % every instance of \includegraphics
+   \DeclareGraphicsExtensions{.pdf,.jpeg,.png,.jpg}
+\else
+  % or other class option (dvipsone, dvipdf, if not using dvips). graphicx
+  % will default to the driver specified in the system graphics.cfg if no
+  % driver is specified.
+  % \usepackage[dvips]{graphicx}
+  % declare the path(s) where your graphic files are
+  % \graphicspath{{../eps/}}
+  % and their extensions so you won't have to specify these with
+  % every instance of \includegraphics
+  % \DeclareGraphicsExtensions{.eps}
+\fi
+
+\providecommand{\PSforPDF}[1]{#1}
+% Note that in order for ps4pdf to work, all commands related to psfrag,
+% pstricks, etc. must be called within the PSforPDF command. This applies
+% even when *loading* via \usepackage psfrag.sty, etc.
+
+%\usepackage{algorithmic}
+\usepackage{verbatim}
+\usepackage{algpseudocode}
+\usepackage{algorithm}
+%
+% TODO: the IEEE coments warn not to use algorithm, but instead
+% to use algorithmic... however, algorithmic either looks terrible or
+% maybe just does not explain how to make its format look good,
+% so I am using the algorithm package anyway for now (which happens to
+% have an "algorithmic" tag, so am I misunderstanding?).
+% I am not sure if this will break the typesetting later, but it looks
+% good so far.
+%
+
+\usepackage{caption}
+\usepackage{subcaption}
+
+% correct bad hyphenation here
+\hyphenation{op-tical net-works semi-conduc-tor}
+
+
+\begin{document}
+%
+% paper title
+% can use linebreaks \\ within to get better formatting as desired
+\title{\large Final Project - Planning Motions of \\ Multiple Robots with Prioritized Planning}
+
+\author{\small Brian~Moriarty
+        /~Stuart~Roettger% <-this % stops a space
+\IEEEcompsocitemizethanks{\IEEEcompsocthanksitem B. Moriarty is a student at George Mason University.\protect\\
+% note need leading \protect in front of \\ to get a newline within \thanks as
+% \\ is fragile and will error, could use \hfil\break instead.
+E-mail: bmoriart@gmu.edu
+\IEEEcompsocthanksitem S. Roettger is a student at George Mason University.\protect\\
+E-mail: sroettger@gmu.edu}% <-this % stops a space
+\thanks{CS689 Project turned in May 11, 2012.}}
+
+% make the title area
+\maketitle
+
+\IEEEdisplaynotcompsoctitleabstractindextext
+% \IEEEdisplaynotcompsoctitleabstractindextext has no effect when using
+% compsoc under a non-conference mode.
+
+
+% For peerreview papers, this IEEEtran command inserts a page break and
+% creates the second title. It will be ignored for other modes.
+\IEEEpeerreviewmaketitle
+
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\section{Introduction}
+\IEEEPARstart{P}{lanning} motions of multiple robots or of robots in dynamic environments presents new challenges in the form of coordination which are not encountered by single robot path planners in static environments. Prioritized Planning is an approach to multiple robot planning which permits each robot to be associated with its own unique starting state and goal state and then planned individually using any planner that could be used in a single robot environment. Our work investigates how the prioritized order of the robots impacts whether all robots are able to achieve their goal state. \par
+Section 2 discusses single robot algorithms and the intent of prioritized planning. Section 3 describes our implementation of prioritized planning. Section 4 shows experimental scenes with and without using our priority heuristic, and also discusses the efforts of other researchers on this problem.
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\section{Background}
+\emph{Centralized Planning} is a strategy for solving movements of multiple robots by treating the group as a having a single shared state. Each sample state includes the configuration for all of the robots, and one robot in an invalid configuration can invalidate the entire sample. This approach is effective up to a point, but it does not scale well. Increasing the number of robots has the same effect as increasing the dimensionality of the problem \cite{lavalle}.
+\par
+\emph{Decoupled Planning} is a strategy for solving multiple robot problems where each robot can be solved for separately, and then various sub-categories of decoupled planning describe strategies for coordinating the resulting individual paths. One of the benefits of the decoupled approach is that scaling in the number of robots is just like solving for each robot one after the other, so this approach inherits the scaling characteristics of the underlying single robot planner. 
+\par
+\emph{Prioritized Planning} is often considered a sub-category of Decoupled Planning \cite{lavalle}. In prioritized planning, a priority order is set for a group of robots ${A_{1..n}}$, ahead of the planning process. Then, as each robot ${A_{i}}$ discovers its own path to the goal, the next ${A_{i+1}}$ can solve for its path treating all ${A_{1..i}}$ robots as obstacles. The key to this approach is being able to easily identify where any ${A_{i}}$ robot plans to be at a given time step so collisions can be detected accurately.
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\section{Approach}
+\subsection{Simulation Framework}
+We modified the Homework 3 framework to support multiple robots. In Homework 3 a scene was comprised of a single disc robot, a single disc goal and multiple disc obstacles. Our modified framework continues to use disc obstacles, but now supports multiple rectangular robots. Each robot is associated with its own disc goal. A robot geometry is defined by length and width. The robot state is defined by a center point and orientation. In addition, each robot may be associated with a planner implementation specific to it,  offering support for testing how different planning algorithms interact with each other. Lastly, the file format allows for identifying the priority function to be used when deciding the robot planning order.
+
+\subsection{Algorithm}
+We follow the basic algorithm for prioritized planning as listed in Algorithm \ref{priplanner}. The priority of the robot planning order is set based on a user specified priority function. We use a priority function to build a max heap, with the higher priority robots being popped off and solved one at a time. Line 8 of the algorithm is calling solve on the current robot and indicates the robot should avoid previously solved robots, in addition to any obstacles.
+\par
+We provide two categories of priority function. The baseline prioritizes the planners in either forward or reverse order of how they are listed in the configuration file. The second option prioritize the planners according to their minimum average obstacle distance. Our implementation of this second approach figures out the priorities at runtime, but does not change the priorities once the planning process has begun. This differs from the \emph{Dynamic Priority Scheme} described in \cite{slides} where priorities may be reordered periodically at meaningful time steps. We chose to use \emph{Static Priority Schemes} where lower priority robots are not considered until higher priority robots have a full path to the goal. We made this decision for 2 reasons. First, although a dynamic approach would offer additional opportunities to coordinate movement, our scenes expose initial states where priority alone does not produce a different outcome. Second, the expense of re-prioritization and re-planning each robot seemed unjustified in our scenes where the robots are the only mobile objects. We think \emph{Dynamic Prioritization} would be most valuable in scenes where objects may move outside of what the robots are coordinating among themselves.
+
+%%%%%%%%%%%%%%%%%%%
+% pdeudo code
+\begin{algorithm}
+\caption{Prioritized Planning}\label{priplanner}
+\begin{algorithmic}[1]
+\State $M \gets$ list of N new Robots
+\State $Heap \gets$ $MaxHeap(M)_{priority function}$
+\While{not $Heap.empty$}
+	\State $A \gets Heap.pop$
+	\State $A.solve(avoid$[$obstacles + M_{solved==true}$]$)$
+	\State $A.solved = true$
+\EndWhile
+\end{algorithmic}
+\end{algorithm}
+%%%%%%%%%%%%%%%%%%%
+
+The solve function on line 8 is where any arbitrary single robot planning algorithm may be used. When a random state is chosen for $A$ and checked against the other $M_{solved=true}$ robots, a timing function is required in order to predict where the other robots will be at the time when $A$ would be at the random state. Algorithm 2 provides the pseudo code for how we calculate time. We treat each step along the planned path as a step in time. Whenever we add a new state to a planner's vertex tree, we assume it will be part of the final path and we assign a step count to it, indicating the time the robot would be in that state. Line 3 of Algorithm \ref{pritime} shows how the time is predicted, by simply adding one to the previous vertex's time. Line 10 shows how we use the time value as an index to the corresponding state from the path of another already solved robot for collision detection.
+
+%%%%%%%%%%%%%%%%%%%
+% pdeudo code
+\begin{algorithm}
+\caption{Timing Strategy}\label{pritime}
+\begin{algorithmic}[1]
+\State $sto \gets Random~State$
+\State $v \gets Choose~Vertex~Connection$
+\State $sto.time \gets v.time + 1$
+\ForAll{$X_{i}$ in $Obstacles$}
+\If{$IsCollision(sto, X_{i})$}
+\State return
+\EndIf
+\EndFor
+\ForAll{$A_{i}$ in $A_{solved==true}$}
+\If{$IsCollision$($sto$, $A_{i}.path$[$sto.time$]$)$}
+\State return
+\EndIf
+\EndFor
+\State $AddNewVertex(sto)$
+\end{algorithmic}
+\end{algorithm}
+%%%%%%%%%%%%%%%%%%%
+
+\par
+Prioritized planning may use any single robot planning algorithm to plan the individual robots. We migrated several implementations of single robot tree based planners from our Homework 3 to work in the multi-robot framework. RRT chooses the vertex based on shortest euclidean distance, and is primarily what we used for experimentation in this paper.
+
+\subsection{Path Smoothing}
+We explored basic path smoothing by extending our RRT algorithm with a path smoothing algorithm. We modeled our smoothing solution on pseudo code we found in \cite{jarvis}. We looked at the first pair(LastNode, NextNode) of vertices and if there was a valid path between them then we set NextNode to the next vertex in the path and compared them again.  When we come to a pair of vertices that don't have a valid path then we add the previous point(NextNode-1) to the path and set LastNode equal to NextNode-1 and NextNode equal to the next vertex.  \par
+This algorithm provides a little smoothing to the path found by RRT.  There are definitely places that the algorithm doesn't find the best path but that can be explained by the way the algorithm finds which two points to connect.   There are some instances where if we compared all points, then generated the path that we could find a lot smoother path.  This algorithm short circuits to the last point found before an invalid path so it can't skip over obstacles.  In Figure \ref{fig:smoothing} the two points notated by the black arrows are connected because the LastNode, the point below arrow 1, is compared to the NextNode while it walks down the path until there is an obstacle.  NextNode ends up at the second arrow.  If the algorithm was smarter it could have cut off a lot of the corner.
+
+%%%%%%%%%%%%%%%%%%%
+% scene images
+\begin{figure}[ht]
+\centering
+{\includegraphics[width=1.5in,height=1.75in,clip,keepaspectratio]{path_smoothing.jpg}}
+\caption{Limitation of path smoothing algorithm}\label{fig:smoothing}
+\end{figure}
+%%%%%%%%%%%%%%%%%%%
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\section{Experimentation}
+Our experimentation focused on scene configurations which expose timing conflicts among robots. We set out with the intention of demonstrating how planning order can impact the ability of the algorithm to find a solution for all robots as motivation for comparing priority functions. As we progressed in experimentation we observed that we could easily produce scenes where all priority orders would lead to failure even though the scene was solvable. All of the test robots used Basic RRT as the single robot planning algorithm, and exclude smoothing.
+
+\subsection{Priority Function Results}\label{sect:priority}
+This section's experiments are designed around a scene where priority matters. Figure \ref{fig:basic1} depicts the initial state of a scene where a Red robot is positioned below an Orange robot's goal in a tight corridor. We performed each test 10 times, giving the robots 60 seconds of processing time to find a path for both robots. Success is measured by both robots reaching the goal, if one robot fails to find the goal the test is qualified as a failure. The average and mean times count  the cumulative processing time of both robots to reach the goal, and failed tests are not included in those numbers.
+\par
+Figure \ref{fig:basic2} depicts the same scene after the robots have had time to attempt a solution, and Orange was planned first. In this case, Orange traveled quickly into the corridor, and since Orange has clogged the exit, Red cannot plan a way out. Figure \ref{fig:basic3} depicts the same scene again after using our average obstacle distance priority function. The priority function plans Red first because Red is packed in more tightly by the obstacles. In this scene the corridor was blocked as Red traversed out of the corridor, preventing Orange from finding the most direct route. After a short detour Orange returns to the corridor later when it is clear.
+
+%%%%%%%%%%%%%%%%%%%
+% scene images
+\begin{figure}[ht]
+\centering
+\makebox[3in]{\begin{subfigure}[p]{0.15\textwidth}
+	{\includegraphics[width=1in,height=1.25in,clip,keepaspectratio]{basic_scene_a.jpg}}
+	\caption{Initial Scene}
+	\label{fig:basic1}
+\end{subfigure}
+\begin{subfigure}[p]{0.15\textwidth}
+	{\includegraphics[width=1in,height=1.25in,clip,keepaspectratio]{basic_scene_b.jpg}}
+	\caption{Orange First}
+	\label{fig:basic2}
+\end{subfigure}
+\begin{subfigure}[p]{0.15\textwidth}
+	{\includegraphics[width=1in,height=1.25in,clip,keepaspectratio]{basic_scene_c.jpg}}
+	\caption{Red First}
+	\label{fig:basic3}
+\end{subfigure}}
+\caption{Priority can influence solution}\label{fig:basicscenes}
+\end{figure}
+%%%%%%%%%%%%%%%%%%%
+
+%%%%%%%%%%%%%%%%%%%
+\begin{table}[ht]\renewcommand{\arraystretch}{1.3}\caption{Impact of Priority}\label{basicresults}\centering \begin{tabular}{||c||c||c||c||}\hline\bfseries Scene & \bfseries Avg & \bfseries Mean & \bfseries Success\\\hline\hline\ref{fig:basic2} & 0.003170 & 0.005511 & 40\%\\\hline\ref{fig:basic3} & 1.715404 & 0.200755 & 100\%\\\hline
+\hline\end{tabular}\end{table}
+%%%%%%%%%%%%%%%%%%%
+Table \ref{basicresults} shows the results of testing. The success ratings clearly demonstrate that priority matters in this scene, with a low success rate of 40\% when Orange planned first. The perfect success rate observed when Red planned first is paired with a relatively high time to solution. Those high times are a result of the Orange planner having to work harder since for many of the early steps the corridor would have been blocked while Red exited. The fact that choosing Red was done dynamically at runtime before the planning process began shows that average obstacle distance can be a reasonable heuristic for prioritized planning in some scenes. However, we will further discuss the implications of priority in the next section using a scene where priority does not influence the outcome.
+
+% needed in second column of first page if using \IEEEpubid
+%\IEEEpubidadjcol
+
+\subsection{Importance of Timing}
+While Section \ref{sect:priority} demonstrated how priority order can improve the planning success rate, we observed a number of scene states where order does not resolve the robot traffic jam. The scenes in Figure \ref{fig:hardscenes} show an initial state that cannot be easily solved by Basic RRT regardless of the planning order. Scenes \ref{fig:hard2} and \ref{fig:hard3} show how the corridor can be blocked no matter who plans first. We again performed comparison tests between alternative planning orders on the \ref{fig:hard1} initial state and collected data for 10 runs on each configuration.
+
+%%%%%%%%%%%%%%%%%%%
+% scene images
+\begin{figure}[ht]
+\centering
+\makebox[3in]{\begin{subfigure}[p]{0.15\textwidth}
+	{\includegraphics[width=1in,height=1.25in,clip,keepaspectratio]{basic_hard_a.jpg}}
+	\caption{Initial Scene}
+	\label{fig:hard1}
+\end{subfigure}
+\begin{subfigure}[p]{0.15\textwidth}
+	{\includegraphics[width=1in,height=1.25in,clip,keepaspectratio]{basic_hard_b.jpg}}
+	\caption{Orange First}
+	\label{fig:hard2}
+\end{subfigure}
+\begin{subfigure}[p]{0.15\textwidth}
+	{\includegraphics[width=1in,height=1.25in,clip,keepaspectratio]{basic_hard_c.jpg}}
+	\caption{Red First}
+	\label{fig:hard3}
+\end{subfigure}}
+\caption{Timing can obstruct solution}\label{fig:hardscenes}
+\end{figure}
+%%%%%%%%%%%%%%%%%%%
+
+%%%%%%%%%%%%%%%%%%%
+\begin{table}[ht]\renewcommand{\arraystretch}{1.3}\caption{Limitations of Timing with Basic RRT}\label{hardresults}\centering \begin{tabular}{||c||c||c||c||}\hline\bfseries Scene & \bfseries Avg & \bfseries Mean & \bfseries Success\\\hline\hline\ref{fig:hard2} & - & - & 0\%\\\hline\ref{fig:hard3} & 28.338652 & 28.338652 & 10\%\\\hline
+\hline\end{tabular}\end{table}
+%%%%%%%%%%%%%%%%%%%
+Table \ref{hardresults} provides the experimental results, and shows a low success rate for either planning order. These scenes and results expose a weakness in our overall algorithm. We identify two specific causes to explain these failures. 
+\par
+First, we point at the underlying planner. Basic RRT chooses to connect points to its tree by euclidean distance. These paths tend to be efficient in the sense that the connected points tend to have minimal meandering. The lack of meandering makes it difficult for RRT to enter the corridor at later times, since it prefers to arrive along shorter line distances. In the case of \ref{fig:hard2}, we can see that priority would be a factor similar to \ref{sect:priority}. However, in the case of \ref{fig:hard3}, the Orange robot should be able to find a path but usually cannot. The failure occurs because Orange is able to arrive at the corridor entrance too early, before Red has exited.
+\par
+Observing the early arrival of Orange brings us to our second culprit: our timing function. Our timing function does not permit the robot to sit still and wait, but instead the robot wants to always march forward along its path. RRT is locked into choosing the nearest vertex, which inadvertently connects position and time, limiting RRT's ability to produce an alternative path.
+\par
+We want to identify both a smarter timing solution, and single robot planner that can take advantage of it. These observations motivate a search for alternative solutions in literature. \cite{bergprm} identifies similar challenges for prioritized planning, but suggests a prioritization function based on an underlying roadmap rather than letting each robot sample and build a path for the scene. We like their PRM approach for this problem because it is designed for multiple queries, which is exactly what a prioritized planning solution for multiple robots requires. A perfectly efficient road map could limit the robots ability to choose alternative paths, and research in \cite{bergprm} was done to identify that good roadmaps for this problem will include cycles. That paper references the earlier \cite{overcycles} which discusses strategies for deciding which cycles should be included in the graph, as a way of maintaining a balance of efficiency with flexibility.
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\section{Conclusion}
+We demonstrated a basic implementation of prioritized planning for multiple robots using Basic RRT as the underlying single robot planner. This algorithm works reasonable well in general cases where there is limited opportunity for begin stuck in tight corridors. We exposed some of the problem areas presented by this approach in relation to timing and the choice of the underlying planning algorithm. Research has been done by others on this problem, and additional work should be done to who how alternative approaches might solve the scenes with higher success rates.
+
+% Can use something like this to put references on a page
+% by themselves when using endfloat and the captionsoff option.
+\ifCLASSOPTIONcaptionsoff
+  \newpage
+\fi
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\begin{thebibliography}{1}
+
+\bibitem{lavalle}
+S.~M.~LaValle, \emph{Planning Algorithms}\hskip 1em plus
+  0.5em minus 0.4em\relax University of Illinois: Cambridge University Press, 2006, pp. 266-269.
+
+\bibitem{slides}
+A.Shehu, \emph{CS689 - Planning Motions of Robots}\hskip 1em plus
+  0.5em minus 0.4em\relax George Mason University: Course Slides for Multiple Robots.
+ 
+\bibitem{bergprm}
+J.~P.~van den Berg and M.~H.~Overmars, \emph{Roadmap-Based Motion Planning in Dynamic Environments}\hskip 1em plus
+  0.5em minus 0.4em\relax IEEE Transactions on Robotics, vol 21, no. 5, October 2005, pp. 885-897.
+
+\bibitem{bergpri}
+J.~P.~van den Berg and M.~H.~Overmars, \emph{Prioritized Motion Planning for Multiple Robots}\hskip 1em plus
+  0.5em minus 0.4em\relax IEEE/RSJ International Conference on Intelligent Robots and Systems, 2005, pp. 430-435.
+
+\bibitem{overcycles}
+D.~Nieuvenhuisen and M.~H.~Overmars, \emph{Useful Cycles in Probabilistic Roadmap Graphs}\hskip 1em plus
+  0.5em minus 0.4em\relax IEEE International Conference on Robotics and Automation, vol 1, 2004, pp. 446-452.
+ 
+\bibitem{jarvis}
+Z.~Deak and J.~Jarvis, \emph{Robotic Path Planning using Rapidly exploring Random Trees},\hskip 1em plus 0.5em minus 0.4em\relax : Intelligent Robotics Research Center - Monash University.
+  
+\end{thebibliography}
+\end{document}
+
+
